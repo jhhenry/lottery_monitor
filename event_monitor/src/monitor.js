@@ -1,7 +1,7 @@
 const Web3 = require('web3');
-const Kafka = require('node-rdkafka');
+const KafkaClient = require('./kafka_client');
 
-function run(eth_node, ws_origin, contract_address, abi, since, kafka_brokers) {
+function run(eth_node, ws_origin, contract_address, abi, since, kafka_brokers, topic) {
     //eval()
     const provider = new Web3.providers.WebsocketProvider(eth_node, {headers: {
     Origin: ws_origin
@@ -15,10 +15,16 @@ function run(eth_node, ws_origin, contract_address, abi, since, kafka_brokers) {
     console.log("start monitoring RedeemedLottery events");
     // start monitoring the specific event of the contract
     // subscribe the event
-    lotteryC.events.RedeemedLotttery().on(
-        "data", e => {
-            console.log(e.returnValues);
-    });
+    KafkaClient.getProducer(kafka_brokers).then(r => {
+        const producer = r;
+        lotteryC.events.RedeemedLotttery().on(
+            "data", e => {
+                const event = JSON.stringify(e);
+                console.log("captured event", e.returnValues);
+                producer.produce(topic, null, Buffer.from(event), "key", Date.now());
+        });
+    })
+    
 }
 
 module.exports = run;

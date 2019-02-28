@@ -16,7 +16,7 @@ try {
     logBlue(`eth_info: ${eth_info}`);
     const abi = JSON.parse(flags.abi ? flags.abi: default_abi);
     logBlue(`abi: ${abi}`);
-    monitor(eth_info, flags.wsorigin ? flags.wsorigin: "http://localhost", flags.address, abi, flags.since, flags.kafka);
+    monitor(eth_info, flags.wsorigin ? flags.wsorigin: "http://localhost", flags.address, abi, flags.since, flags.kafka, flags.topic);
 } catch(e) {
     console.error(e);
 }
@@ -35,6 +35,7 @@ function constructCLIHelper()
             --abi -i     contract abi
             --since -s   block number since which the events are captured
             --kafka -k   kafka brokers list
+            --topic -t   kafka topic
     `;
     const options = {
         flags: {
@@ -57,6 +58,10 @@ function constructCLIHelper()
             kafka: {
                 type: 'string',
                 alias: 'k'
+            },
+            topic: {
+                type: 'string',
+                alias: 't'
             }
         }
     }
