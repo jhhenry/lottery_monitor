@@ -17,14 +17,27 @@ function run(eth_node, ws_origin, contract_address, abi, since, kafka_brokers, t
     // subscribe the event
     KafkaClient.getProducer(kafka_brokers).then(r => {
         const producer = r;
+        if(!isNaN(since)) {
+            lotteryC.getPastEvents("RedeemedLotttery", {fromBlock: since}).then(events => {
+                if(events.forEach) {
+                    events.forEach(e => {
+                        sendToKafka(producer, topic, e, "key", Date.now());
+                    });
+                }
+            });
+        }
+        
         lotteryC.events.RedeemedLotttery().on(
             "data", e => {
-                const event = JSON.stringify(e);
-                console.log("captured event", e.returnValues);
-                producer.produce(topic, null, Buffer.from(event), "key", Date.now());
+                sendToKafka(producer, topic,  e, "key", Date.now());
         });
-    })
-    
+    });
+}
+
+function sendToKafka(producer, topic, e, key, timestamp) {
+    const event = JSON.stringify(e);
+    console.log(`timestamp: ${timestamp}`);
+    producer.produce(topic, null, Buffer.from(event), key, timestamp);
 }
 
 module.exports = run;

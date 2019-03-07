@@ -7,7 +7,7 @@ const fs = require('fs');
 
 const logBlue = log.logBlue("index.js");
 const logCyan = log.logCyan("index.js");
-const default_abi = fs.readFileSync("src/abi.json");
+const default_abi = fs.readFileSync("../src/abi.json");
 try {
     const cli = constructCLIHelper();
     const flags = cli.flags;
