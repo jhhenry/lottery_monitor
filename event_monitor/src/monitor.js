@@ -21,7 +21,8 @@ function run(eth_node, ws_origin, contract_address, abi, since, kafka_brokers, t
             lotteryC.getPastEvents("RedeemedLotttery", {fromBlock: since}).then(events => {
                 if(events.forEach) {
                     events.forEach(e => {
-                        sendToKafka(producer, topic, e, "key", Date.now());
+                        //console.log(`txn: ${e.transactionHash}`)
+                        sendToKafka(web3, producer, topic, e, "key", Date.now());
                     });
                 }
             });
@@ -29,15 +30,23 @@ function run(eth_node, ws_origin, contract_address, abi, since, kafka_brokers, t
         
         lotteryC.events.RedeemedLotttery().on(
             "data", e => {
-                sendToKafka(producer, topic,  e, "key", Date.now());
+                sendToKafka(web3, producer, topic,  e, "key", Date.now());
         });
     });
 }
 
-function sendToKafka(producer, topic, e, key, timestamp) {
+async function sendToKafka(web3, producer, topic, e, key, timestamp) {
+    const lottery_sig = await getLotterySignature(web3, e);
+    e.lottery_sig = lottery_sig;
     const event = JSON.stringify(e);
-    console.log(`timestamp: ${timestamp}`);
+    // console.log(`timestamp: ${timestamp}`);
     producer.produce(topic, null, Buffer.from(event), key, timestamp);
+}
+
+async function getLotterySignature(web3, e) {
+    const txn = await web3.eth.getTransaction(e.transactionHash);
+    const params = web3.eth.abi.decodeParameters(['bytes', 'bytes', 'bytes'], '0x' + txn.input.substr(10));
+    return params[1];    
 }
 
 module.exports = run;
