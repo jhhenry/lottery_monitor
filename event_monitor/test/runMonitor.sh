@@ -1,0 +1,1 @@
+../src/index.js -a 0x8df85cae3ec45360a9bdfb2ea6ff6c31905da5d6  --since 2323 --kafka 192.168.56.103:9092,192.168.56.103:9093,192.168.56.103:9094 -e ws://192.168.56.123:8566 --wsorigin http://localhost --topic lottery-monitor-dev

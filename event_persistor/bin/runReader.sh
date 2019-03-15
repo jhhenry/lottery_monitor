@@ -1,0 +1,1 @@
+./index.js --kafka 192.168.56.103:9092,192.168.56.103:9093,192.168.56.103:9094 --topic lottery-monitor-dev -g test-consumer -o 71

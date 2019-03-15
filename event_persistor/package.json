@@ -1,0 +1,15 @@
+{
+  "name": "event_persistor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "ava --verbose"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "meow": "^5.0.0",
+    "mysql2": "^1.6.5"
+  }
+}
