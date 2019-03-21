@@ -12,7 +12,7 @@ create table events(
     id SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
     txn CHAR(66) NOT NULL,
     blockNumber SMALLINT UNSIGNED,
-    ts TIMESTAMP NOT NULL,
+    event_capture_time TIMESTAMP(3) NOT NULL,
     event_type VARCHAR(30) NOT NULL,
     event_info JSON NOT NULL,
     PRIMARY KEY (id)
