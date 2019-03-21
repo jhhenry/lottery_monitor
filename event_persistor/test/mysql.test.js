@@ -1,21 +1,48 @@
 
 const test = require('ava');
 const persistor = require('../event_persist');
+const fs = require('fs');
+const path = require('path');
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
+test.before('set up connection and create tables', async t => {
+    const newDatabaseName = 'test_' + Date.now();
+    //console.log(`t.context: ${t.context}`);
+    t.context.newDatabaseName = newDatabaseName;
+    const createDatabasesStr = "CREATE DATABASE IF NOT EXISTS " + newDatabaseName;
+    
+    const result = await exec(`mysql -u root -pHjin_5105 -e "${createDatabasesStr}" `);
+    console.log(`create database result: ${result.stdout}`);
+    const con = await persistor.createConnection('localhost', 3306, "root", 'Hjin_5105', newDatabaseName);
+    t.context.con = con;
+    const createStat = fs.readFileSync(path.resolve(__dirname,"..", "database", "schema.sql")).toString();
+    const index = createStat.lastIndexOf('create table');
+    //console.log(`createStat: ${createStat}`);
+    await con.query(createStat.substr(0, index));   
+    await con.query(createStat.substr(index));
+       
+});
+
+test.after.always("cleanup: delete databases", async t => {
+    const newDatabaseName = t.context.newDatabaseName;
+    const dropDatabase = "drop database " + newDatabaseName; 
+    const result = await exec(`mysql -u root -pHjin_5105 -e "${dropDatabase}" `);
+    console.log(`drop database result: ${result}`);
+});
 
 test('connection test', async t => {
-    let con = await persistor.createConnection('localhost', 3306, "root", 'Hjin_5105', 'test');
+    const con = t.context.con;
     let [rows, fields] = await con.query("select * from events");
     console.log(`rows: ${rows.length}\nfields: ${fields[0]}`);
     t.pass();
 })
 
 test('insert into test', async t=> {
-    let con = await persistor.createConnection('localhost', 3306, "root", 'Hjin_5105', 'test');
-    console.log((new Date()).toISOString());
+    const con = t.context.con;
     const eventInfo = {
         blockNumber: 5,
         event_type: 'RedeemedLotttery',
-        event_capture_time: '2019-03-20T03:01:44.075',
+        event_capture_time: (new Date()).toISOString().substr(0, 22),
         txn: '0xb2b101a14487dd45c6861d6da2f7bea2de13b45af6edb2731f748bf4f41d3b98',
         event_info: `{
             "address": "0x6dEFcB6F97E4b9765B88ebcaAF8A98f6338571f3",
@@ -64,5 +91,22 @@ test('insert into test', async t=> {
         sender: '0xbD6d6abFBA84Efe632dd6E93CEef88a7F8333bfD'
     };
     await persistor.recordRedeemedEvent(con, eventInfo, redeemedInfo);
+
+    let [rows, fields] = await con.query("select * from events");
+    //console.log(fields.length);
+    t.is(rows.length, 1);
+    t.is(fields.length, 6);
+    const r = rows[0];
+    t.is(r.id, 1)
+    t.is(r.txn, eventInfo.txn);
+
+    let [rows2, fields2] = await con.query("select * from redeemedInfo");
+    t.is(rows2.length, 1);
+    t.is(fields2.length, Object.keys(redeemedInfo).length);
+    redeemedInfo.id = r.id;
+    Object.keys(redeemedInfo).forEach(e => {
+        t.is(rows2[0][e], redeemedInfo[e]);
+        //console.log(`${e}: ${rows2[0][e]}`)
+    })
     t.pass();
 })

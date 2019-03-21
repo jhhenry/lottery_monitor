@@ -16,17 +16,18 @@ async function disconnect(connection) {
 
 async function recordRedeemedEvent(connection, eventValues, redeemedValues) {
     try {
-        
+
 
         const beginResult = await connection.beginTransaction();
-        log('beginResult: ', beginResult);
+        //log('beginResult: ', beginResult);
         const eventResult = await connection.query('INSERT INTO events SET ?', eventValues);
-        log('eventResult: ', eventResult);
+        //log('eventResult: ', eventResult);
         redeemedValues.id = eventResult[0].insertId;
-        const redeemedInfoResult = await connection.query('INSERT INTO redeemedInfo SET ?', redeemedValues);
-        log('redeemedInfoResult: ', redeemedInfoResult);
+        //const redeemedInfoResult = 
+        await connection.query('INSERT INTO redeemedInfo SET ?', redeemedValues);
+        //log('redeemedInfoResult: ', redeemedInfoResult);
         const commitResult = connection.commit();
-        log('commitResult', commitResult);
+        //log('commitResult', commitResult);
         await commitResult;
     } catch(err) {
         connection.rollback();
