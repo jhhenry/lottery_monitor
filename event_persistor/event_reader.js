@@ -1,6 +1,8 @@
 const kafka_client = require("./kafka_client");
+const {PersistentHandler} = require('./event_handler');
 const log = console.log;
-function run(kafkaBrokers, topic, group, offset, cb) {
+
+function run(kafkaBrokers, topic, group, offset, host, port, user, pwd, database,cb) {
 
     const consumer_p = kafka_client.getConsumer(group, kafkaBrokers);
     consumer_p.then(c => {
@@ -11,7 +13,8 @@ function run(kafkaBrokers, topic, group, offset, cb) {
         }
         consumer.consume();
         log(`start consuming on topic '${topic}' from the offset ${offset}, using the group ${group}`);
-        const dataHandler = cb ? cb : onData;
+        const persistHandler = new PersistentHandler(host, port, user, pwd, database);
+        const dataHandler = cb ? cb : persistHandler.handleEvent;
         consumer.on("data", dataHandler);
     })
 }

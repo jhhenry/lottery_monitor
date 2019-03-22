@@ -36,8 +36,10 @@ function run(eth_node, ws_origin, contract_address, abi, since, kafka_brokers, t
 }
 
 async function sendToKafka(web3, producer, topic, e, key, timestamp) {
+    e.capture_time = (new Date()).toISOString().substr(0, 22);
     const lottery_sig = await getLotterySignature(web3, e);
     e.lottery_sig = lottery_sig;
+    
     const event = JSON.stringify(e);
     // console.log(`timestamp: ${timestamp}`);
     producer.produce(topic, null, Buffer.from(event), key, timestamp);

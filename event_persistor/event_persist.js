@@ -1,5 +1,4 @@
 const mysql = require('mysql2/promise');
-
 const log = console.log;
 
 async function createConnection(host, port, user, pwd, database) {
@@ -10,15 +9,23 @@ async function createConnection(host, port, user, pwd, database) {
     return connection;
 }
 
+async function createPool(host, port, user, pwd, database)
+{
+    const pool = await mysql.createPool({host, port, user, password: pwd, database});
+    return pool;
+}
+
+async function getConnectionFromPool(pool) {
+    return await pool.getConnection();
+}
+
 async function disconnect(connection) {
     await connection.end();
 }
 
 async function recordRedeemedEvent(connection, eventValues, redeemedValues) {
     try {
-
-
-        const beginResult = await connection.beginTransaction();
+        await connection.beginTransaction();
         //log('beginResult: ', beginResult);
         const eventResult = await connection.query('INSERT INTO events SET ?', eventValues);
         //log('eventResult: ', eventResult);
@@ -33,43 +40,10 @@ async function recordRedeemedEvent(connection, eventValues, redeemedValues) {
         connection.rollback();
         throw err;
     }
-    // connection.beginTransaction(function (err) {
-    //     if (err) { throw err; }
-    //     /*
-    //     txn CHAR(66) NOT NULL,
-    //     blockNumber SMALLINT UNSIGNED,
-    //     ts TIMESTAMP NOT NULL,
-    //     event_type VARCHAR(30) NOT NULL,
-    //     event_info JSON NOT NULL,
-    //     */
-
-    //     connection.query('INSERT INTO events SET ?', eventValues, function (error, results, fields) {
-    //         if (error) {
-    //             return connection.rollback(function () {
-    //                 throw error;
-    //             });
-    //         }
-
-    //         var log = 'Post ' + results.insertId + ' added';
-
-    //         connection.query('INSERT INTO  SET data=?', log, function (error, results, fields) {
-    //             if (error) {
-    //                 return connection.rollback(function () {
-    //                     throw error;
-    //                 });
-    //             }
-    //             connection.commit(function (err) {
-    //                 if (err) {
-    //                     return connection.rollback(function () {
-    //                         throw err;
-    //                     });
-    //                 }
-    //                 console.log('success!');
-    //             });
-    //         });
-    //     });
-    // });
 }
 
+module.exports.createPool = createPool;
+module.exports.getConnectionFromPool = getConnectionFromPool;
 module.exports.createConnection = createConnection;
 module.exports.recordRedeemedEvent = recordRedeemedEvent;
+module.exports.disconnect = disconnect;

@@ -28,6 +28,8 @@ test.after.always("cleanup: delete databases", async t => {
     const dropDatabase = "drop database " + newDatabaseName; 
     const result = await exec(`mysql -u root -pHjin_5105 -e "${dropDatabase}" `);
     console.log(`drop database result: ${result}`);
+    const con = t.context.con;
+    await persistor.disconnect(con);
 });
 
 test('connection test', async t => {
