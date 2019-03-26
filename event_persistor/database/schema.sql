@@ -15,7 +15,8 @@ create table events(
     event_capture_time TIMESTAMP(3) NOT NULL,
     event_type VARCHAR(30) NOT NULL,
     event_info JSON NOT NULL,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    UNIQUE(txn, event_type)
 );
 /* A table records rs1 & rs2 of a winning lottery. 
 id (foreign key)
@@ -28,7 +29,7 @@ sender
 */
 create table redeemedInfo(
     id SMALLINT UNSIGNED NOT NULL REFERENCES events(id),
-    lottery_sig CHAR(132) NOT NULL KEY,
+    lottery_sig CHAR(132) NOT NULL,
     rs1 VARCHAR(66) NOT NULL,
     rs2 VARCHAR(66) NOT NULL,
     payer CHAR(42) NOT NULL,
