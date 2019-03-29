@@ -56,7 +56,16 @@ function getConsumer(group, broker_list) {
     });
 }
 
+function getAdminClient(broker_list, client_id)
+{
+    return client = Kafka.AdminClient.create({
+        'client.id': client_id,
+        'metadata.broker.list': broker_list
+      });
+}
+
 
 
 module.exports.getProducer = getProducer;
 module.exports.getConsumer = getConsumer;
+module.exports.getAdminClient = getAdminClient;
