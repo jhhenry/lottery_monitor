@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
+const crypto = require('crypto');
 
 async function createTestDatabase(t) {
     const newDatabaseName = 'test_' + Date.now();
@@ -31,5 +32,46 @@ async function dropTestDatabase(t) {
     await persistor.disconnect(con);
 }
 
+async function createTopic(admin, topic, partition, replication_factor)
+{
+    return new Promise((resolve, reject) => {
+        admin.createTopic({
+            topic,
+            num_partitions: partition,
+            replication_factor
+        }, function (err) {
+            // Done!
+            if (err) { reject(err);}
+            console.log('new Topic created, ');
+            setTimeout(resolve, 1000);
+        })
+    });
+}
+
+async function deleteTopic(admin, topic)
+{
+    await new Promise((resolve, reject) => {
+        console.log(`deleting topic, "${topic}"`);
+        setTimeout(() => {
+        admin.deleteTopic(topic, 1000, (err, r) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            console.log('topic deleted: ', r);
+            resolve("");
+        }
+        )}, 1000);
+    });
+}
+
+function getRandBytes(num, encoding)
+{
+   return  crypto.randomBytes(num).toString(encoding ? encoding : 'hex');
+}
+
 module.exports.createTestDatabase = createTestDatabase;
 module.exports.dropTestDatabase = dropTestDatabase;
+module.exports.createTopic = createTopic;
+module.exports.deleteTopic = deleteTopic;
+module.exports.getRandBytes = getRandBytes;
