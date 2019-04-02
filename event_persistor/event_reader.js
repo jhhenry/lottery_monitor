@@ -14,8 +14,11 @@ function run(kafkaBrokers, topic, group, offset, host, port, user, pwd, database
         consumer.consume();
         log(`start consuming on topic '${topic}' from the offset ${offset}, using the group ${group}`);
         const persistHandler = new PersistentHandler(host, port, user, pwd, database);
-        const dataHandler = cb ? cb : persistHandler.handleEvent;
-        consumer.on("data", dataHandler);
+        //const dataHandler = cb ? cb : persistHandler.handleEvent;
+        consumer.on("data", function(data) {
+           // console.log(`${group} consumed message`);
+            persistHandler.handleEvent(data);
+        });
     })
 }
 

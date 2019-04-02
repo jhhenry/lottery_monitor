@@ -55,7 +55,7 @@ test.after.always("cleanup: delete databases", async t => {
 test.serial('persist test', async t => {
     const p = handler;
     event.lottery_sig = getRandSignature();
-    await p.handleEvent(event);
+    await p.handleEvent({value: JSON.stringify(event)});
     const connect = await p.pool;
     const [rows, ] = await connect.query('select * from events');
     t.is(rows.length, 1);
@@ -66,7 +66,7 @@ test.serial('persist test', async t => {
 test.serial('same event_type but different txn', async t => {
     const p = handler;
     event.transactionHash = event.transactionHash.substr(0, 64) + "ab";
-    await p.handleEvent(event);
+    await p.handleEvent({value: JSON.stringify(event)});
     const connect = await p.pool;
     const [rows, ] = await connect.query('select * from events');
     t.is(rows.length, 2);
@@ -77,7 +77,7 @@ test.serial('same event_type but different txn', async t => {
 test.serial('duplicate events', async t => {
     const p = handler;
     event.transactionHash = event.transactionHash.substr(0, 64) + "ab";
-    await p.handleEvent(event);
+    await p.handleEvent({value: JSON.stringify(event)});
     const connect = await p.pool;
     const [rows, ] = await connect.query('select * from events');
     t.is(rows.length, 2);

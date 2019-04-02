@@ -6,7 +6,7 @@ const exec = util.promisify(require('child_process').exec);
 const crypto = require('crypto');
 
 async function createTestDatabase(t) {
-    const newDatabaseName = 'test_' + Date.now();
+    const newDatabaseName = 'test_' + getRandBytes(20);
     //console.log(`t.context: ${t.context}`);
     t.context.newDatabaseName = newDatabaseName;
     const createDatabasesStr = "CREATE DATABASE IF NOT EXISTS " + newDatabaseName;

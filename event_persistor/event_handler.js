@@ -7,12 +7,13 @@ class PersistentHandler {
         this.pool = event_persist.createPool(host, port, user, pwd, database);
     }
 
-    async handleEvent(event) {
-        if (!event) {
+    async handleEvent(e) {
+        if (!e) {
             return;
         }
         //log(`getConnection: ${this.pool_p.getConnection}`)
-        log(`handling event: ${event.event}`);
+        const event = JSON.parse(e.value);
+        //log(`handling event: ${event.event}`);
         try {
             if (event.event == 'RedeemedLotttery') {
                 const p = await this.pool;

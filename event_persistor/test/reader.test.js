@@ -46,6 +46,9 @@ const event_template = {
 const messags_count = 10;
 
 test.before('produce messages to kafka asynchronously', async t => {
+    //create a new database for test
+    await testUtils.createTestDatabase(t);
+
     // create a temp kafka topic
     console.log('before test');
     const admin = KafkaClient.getAdminClient(brokers, 'admin_client');
@@ -81,15 +84,17 @@ test.after('close kafka admin client', async t => {
     // delete the topic once all the tests completed
     const admin = t.context.admin;
     await testUtils.deleteTopic(admin, t.context.topic);
+    await testUtils.dropTestDatabase(t);
     admin.disconnect();
 });
 
-test('consumer test', async t => {/*  */
+test('successful consuming test', async t => {/*  */
     console.log('consumer test');
     
-    const consumer = await KafkaClient.getConsumer("test_group", brokers);
-    reader(brokers, topic, 'test_group', 0, 'localhost', 3306, 'root', 'Hjin_5105', 'db_test');
+    const consumer = await KafkaClient.getConsumer("test_confirm_group", brokers);
     const topic = t.context.topic;
+    reader(brokers, topic, 'test_group', 0, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
+    
     consumer.subscribe([topic]);
     consumer.consume();
     console.log(`subscribed to the topic: ${topic}`);
@@ -100,13 +105,15 @@ test('consumer test', async t => {/*  */
             const start = Date.now();
             consumer.on("data", (d) => {
                 const event = JSON.parse(d.value);
-                //console.log(`consumed data: ${event}`);
-                Object.keys(event).forEach(k => {
-                    console.log(`${k}: ${event[k]}`);
-                })
+               // console.log(`test_confirm_group consumed data: ${event.transactionHash}`);
+                // Object.keys(event).forEach(k => {
+                //     console.log(`${k}: ${event[k]}`);
+                // })
                 c++;
                 if (c == messags_count) {
-                    resolve();
+                    setTimeout(()=> {
+                        resolve();
+                    }, 1000);// the reader should have consumed all expected messages, too.   
                 }
             });
             setInterval(() => {
@@ -115,6 +122,10 @@ test('consumer test', async t => {/*  */
                 }
             }, 1000);
         });
+        const [event_rows, ] = await t.context.con.query("select id from events");
+        const [redeemed_rows, ] = await t.context.con.query("select lottery_sig from redeemedInfo");
+        t.is(event_rows.length, 10);
+        t.is(redeemed_rows.length, 10);
         t.pass();
     } catch(err) {
         t.fail(err);
