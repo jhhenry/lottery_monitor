@@ -13,19 +13,18 @@ function run(kafkaBrokers, topic, group, offset, host, port, user, pwd, database
         }
         consumer.consume();
         log(`start consuming on topic '${topic}' from the offset ${offset}, using the group ${group}`);
-        const persistHandler = new PersistentHandler(host, port, user, pwd, database);
+       
         //const dataHandler = cb ? cb : persistHandler.handleEvent;
-        consumer.on("data", function(data) {
-           // console.log(`${group} consumed message`);
-            persistHandler.handleEvent(data);
-        });
-    })
-}
-
-function onData(data) {
-    //TODO: persist to the data base
-    console.log('Message found!  Contents below.');
-    console.log(data)
+        if (cb) {
+            consumer.on("data", cb);
+        } else {
+            const persistHandler = new PersistentHandler(host, port, user, pwd, database);
+            consumer.on("data", function(data) {
+                // console.log(`${group} consumed message`);
+                 persistHandler.handleEvent(data);
+             });
+        }
+    });
 }
 
 module.exports = run;

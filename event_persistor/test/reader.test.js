@@ -88,7 +88,7 @@ test.after('close kafka admin client', async t => {
     admin.disconnect();
 });
 
-test('successful consuming test', async t => {/*  */
+test('successful consuming test', async t => {
     console.log('consumer test');
     
     const consumer = await KafkaClient.getConsumer("test_confirm_group", brokers);
@@ -104,11 +104,7 @@ test('successful consuming test', async t => {/*  */
             const timeout = messags_count * 1.5 * 1000;
             const start = Date.now();
             consumer.on("data", (d) => {
-                const event = JSON.parse(d.value);
-               // console.log(`test_confirm_group consumed data: ${event.transactionHash}`);
-                // Object.keys(event).forEach(k => {
-                //     console.log(`${k}: ${event[k]}`);
-                // })
+                // const event = JSON.parse(d.value);
                 c++;
                 if (c == messags_count) {
                     setTimeout(()=> {

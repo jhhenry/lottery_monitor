@@ -1,7 +1,7 @@
 const Kafka = require('node-rdkafka');
 // console.log(Kafka.features);
 // console.log(Kafka.librdkafkaVersion);
-
+const defaultBrokers = "192.168.56.103:9092,192.168.56.103:9093,192.168.56.103:9094";
 
 function getProducer(broker_list) {
     let producer = new Kafka.Producer({
@@ -58,6 +58,11 @@ function getConsumer(group, broker_list) {
 
 function getAdminClient(broker_list, client_id)
 {
+    if (broker_list && broker_list.length) {
+    } else {
+        broker_list = process.env.kafkaBrokers ? process.env.kafkaBrokers : defaultBrokers; 
+    }
+    
     return client = Kafka.AdminClient.create({
         'client.id': client_id,
         'metadata.broker.list': broker_list
@@ -69,3 +74,4 @@ function getAdminClient(broker_list, client_id)
 module.exports.getProducer = getProducer;
 module.exports.getConsumer = getConsumer;
 module.exports.getAdminClient = getAdminClient;
+module.exports.defaultBrokers = defaultBrokers;

@@ -53,13 +53,13 @@ async function deleteTopic(admin, topic)
     await new Promise((resolve, reject) => {
         console.log(`deleting topic, "${topic}"`);
         setTimeout(() => {
-        admin.deleteTopic(topic, 1000, (err, r) => {
+        admin.deleteTopic(topic, 1000, (err) => {
             if (err) {
                 reject(err);
                 return;
             }
-            console.log('topic deleted: ', r);
-            resolve("");
+            //console.log('topic deleted: ', r);
+            resolve();
         }
         )}, 1000);
     });
