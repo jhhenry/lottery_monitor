@@ -1,4 +1,6 @@
 const test = require('ava');
+const chalk = require('chalk');
+const log = console.log;
 const KafkaClient = require('../kafka_client');
 const testUtils = require('./testUtils');
 const reader = require('../event_reader');
@@ -53,12 +55,13 @@ test.before('produce messages to kafka asynchronously', async t => {
     console.log('before test');
     const admin = KafkaClient.getAdminClient(brokers, 'admin_client');
     t.context.admin = admin;
-    const topic = 'event_reader_test_' + Date.now();
+    const topic = 'event_reader_test_' + testUtils.getRandBytes(16, 'hex');
     t.context.topic = topic;
     await testUtils.createTopic(admin, topic, 1, 3);
 
     // constructs events messages
     const producer = await KafkaClient.getProducer(brokers);
+    t.context.producer = producer;
     {
          // send them to the kafka topic
         console.log('start producing test messages to kafka');
@@ -68,11 +71,10 @@ test.before('produce messages to kafka asynchronously', async t => {
             Object.assign(e, event_template);
             e.transactionHash = testUtils.getRandBytes(32, 'hex');
             setTimeout(() => {
-                producer.produce(topic, null, Buffer.from(JSON.stringify(e)), "test_event", Date.now(), (err, offset) => {
-                    console.log(`${count + 1}th message was sent.`);
+                producer.produce(topic, null, Buffer.from(JSON.stringify(e)), "test_event", Date.now());
+                producer.flush(500, () => {
+                    //log(chalk.yellow(`message flushed: ${r1}, ${r2}`));
                 });
-                producer.flush();
-
             }, count * 1000);
             count++;
         }
@@ -86,25 +88,28 @@ test.after('close kafka admin client', async t => {
     await testUtils.deleteTopic(admin, t.context.topic);
     await testUtils.dropTestDatabase(t);
     admin.disconnect();
+    t.context.producer.disconnect();
 });
 
 test('successful consuming test', async t => {
     console.log('consumer test');
-    
-    const consumer = await KafkaClient.getConsumer("test_confirm_group", brokers);
-    const topic = t.context.topic;
-    reader(brokers, topic, 'test_group', 0, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
+    const topic = t.context.topic; 
+    reader(brokers, topic, 'test_group_' + testUtils.getRandBytes(4, 'hex'), 0, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
+    const consumer = await KafkaClient.getConsumer("test_confirm_group" + testUtils.getRandBytes(4, 'hex'), brokers);
     
     consumer.subscribe([topic]);
     consumer.consume();
     console.log(`subscribed to the topic: ${topic}`);
     try {
+       // reader(brokers, topic, 'test_group', -1, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
         await new Promise((resolve, reject) => {
+            //setTimeout(resolve, messags_count * 1500);
             let c = 0;
             const timeout = messags_count * 1.5 * 1000;
             const start = Date.now();
             consumer.on("data", (d) => {
                 // const event = JSON.parse(d.value);
+                // log(chalk.yellow(`received data in the confirm group`));
                 c++;
                 if (c == messags_count) {
                     setTimeout(()=> {
@@ -126,7 +131,7 @@ test('successful consuming test', async t => {
     } catch(err) {
         t.fail(err);
     } finally {
-       consumer.disconnect();
+        consumer.disconnect();
     }
 });
 

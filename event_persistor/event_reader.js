@@ -11,19 +11,25 @@ function run(kafkaBrokers, topic, group, offset, host, port, user, pwd, database
         if (offset != -1) {
             consumer.assign([{topic, partition: 0, offset}]);
         }
-        consumer.consume();
-        log(`start consuming on topic '${topic}' from the offset ${offset}, using the group ${group}`);
-       
+
         //const dataHandler = cb ? cb : persistHandler.handleEvent;
         if (cb) {
             consumer.on("data", cb);
         } else {
             const persistHandler = new PersistentHandler(host, port, user, pwd, database);
+            // log(`will use PersistentHandler to handle kafka events`);
             consumer.on("data", function(data) {
-                // console.log(`${group} consumed message`);
-                 persistHandler.handleEvent(data);
+                //log(`${group} consumed message`);
+                try {
+                    persistHandler.handleEvent(data);
+                } catch(err) {
+                    console.error('persistHandler error:', err);
+                }
+                
              });
         }
+        consumer.consume();
+        log(`start consuming on topic '${topic}' from the offset ${offset}, using the group ${group}`);
     });
 }
 

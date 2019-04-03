@@ -43,7 +43,7 @@ async function createTopic(admin, topic, partition, replication_factor)
             // Done!
             if (err) { reject(err);}
             console.log('new Topic created, ');
-            setTimeout(resolve, 1000);
+            setTimeout(resolve, 5000);
         })
     });
 }
@@ -52,7 +52,7 @@ async function deleteTopic(admin, topic)
 {
     await new Promise((resolve, reject) => {
         console.log(`deleting topic, "${topic}"`);
-        setTimeout(() => {
+        // setTimeout(() => {
         admin.deleteTopic(topic, 1000, (err) => {
             if (err) {
                 reject(err);
@@ -61,7 +61,9 @@ async function deleteTopic(admin, topic)
             //console.log('topic deleted: ', r);
             resolve();
         }
-        )}, 1000);
+        )
+    //}
+        // , 1000);
     });
 }
 

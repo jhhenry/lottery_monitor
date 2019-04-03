@@ -29,17 +29,17 @@ test.after.always('delete kafka topic', async t => {
 
 test(chalk.bgBlue('start from the very beginning of the topic'), async t => {
     const producer = await KafkaClient.getProducer(KafkaClient.defaultBrokers);
+    const ee = new EventEmitter;
+    ee.on('allSent', e => {
+        log(chalk.magentaBright('received allSent event.'));
+        producer.disconnect();
+    })
     // send them to the kafka topic
     const topic = t.context.topic;
     log(chalk.magentaBright('start producing test messages to kafka'));
     const messags_count = 10;
     let count = 0;
     let count_sent = 0;
-    const ee = new EventEmitter;
-    ee.on('allSent', e => {
-        log(chalk.magentaBright('received allSent event.'));
-        producer.disconnect();
-    })
     while (count < messags_count) {
         const e = {};
         e.index = count + 1;
