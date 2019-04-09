@@ -10,7 +10,8 @@
   "license": "ISC",
   "dependencies": {
     "meow": "^5.0.0",
-    "mysql2": "^1.6.5"
+    "mysql2": "^1.6.5",
+    "node-rdkafka": "^2.6.1"
   },
   "devDependencies": {
     "ava": "^1.4.0",

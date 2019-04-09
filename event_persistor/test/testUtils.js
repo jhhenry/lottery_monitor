@@ -42,7 +42,7 @@ async function createTopic(admin, topic, partition, replication_factor)
         }, function (err) {
             // Done!
             if (err) { reject(err);}
-            console.log('new Topic created, ');
+            console.log(`new Topic "${topic}" created.`);
             setTimeout(resolve, 5000);
         })
     });

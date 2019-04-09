@@ -1,7 +1,7 @@
 const Kafka = require('node-rdkafka');
 // console.log(Kafka.features);
 // console.log(Kafka.librdkafkaVersion);
-const defaultBrokers = "192.168.56.103:9092,192.168.56.103:9093,192.168.56.103:9094";
+const defaultBrokers = "192.168.56.103:9092,192.168.56.103:9093";
 
 function getProducer(broker_list) {
     let producer = new Kafka.Producer({
@@ -34,11 +34,40 @@ function getProducer(broker_list) {
     );
 }
 
+function produceMessages(producer, topic, sample_message, messages_count) {
+    return new Promise((resolve, reject) => {
+        let messageDelivered = 0;
+        producer.on('delivery-report', function(err, report) {
+            if(err) {
+                reject(err);
+            }
+            //console.log(report);
+            //if (report.offset >= 0) {
+            messageDelivered++;
+            //}
+            if (messageDelivered >= messages_count) {
+                //console.log(`all messages on ${topic} are sent`);
+                resolve();
+            }
+        });
+        let count = 0;
+        while (count < messages_count) {
+            const e = {};
+            Object.assign(e, sample_message);
+            e.index = count;
+            producer.produce(topic, null, Buffer.from(JSON.stringify(e)), "test_event", Date.now());
+            count++;
+        }
+        setTimeout(() => {reject("producing message timeout");}, 5000);
+    }
+    );
+}
+
 function getConsumer(group, broker_list) {
     let consumer = new Kafka.KafkaConsumer({
         'group.id': group,
         'metadata.broker.list': broker_list,
-        'enable.auto.commit': false,
+        'enable.auto.commit': false
     }, {
         'auto.offset.reset': 'earliest' // consume from the start
     });
@@ -46,11 +75,11 @@ function getConsumer(group, broker_list) {
     return new Promise(
         (resolve, reject) => {
             consumer.on('ready', function() {
-                console.log("enter consumer ready");
+                //console.log("enter consumer ready");
                 resolve(consumer);
             });
             consumer.on('event.error', function(err) {
-                console.error('Error from consumer');
+                console.error('Error from consumer: ', err);
                 reject(err);
             });
     });
@@ -75,3 +104,4 @@ module.exports.getProducer = getProducer;
 module.exports.getConsumer = getConsumer;
 module.exports.getAdminClient = getAdminClient;
 module.exports.defaultBrokers = defaultBrokers;
+module.exports.produceMessages = produceMessages;
