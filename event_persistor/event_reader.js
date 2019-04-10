@@ -1,8 +1,10 @@
+const EventEmitter = require('events');
 const kafka_client = require("./kafka_client");
 const {PersistentHandler} = require('./event_handler');
 const log = console.log;
-class Consumer {
+class Consumer extends EventEmitter{
     constructor(c) {
+        super();
         this.consumer = c;
     }
 
@@ -20,9 +22,9 @@ class Consumer {
         log(`start consuming on topic '${topic}' from the offset ${offset}`);
         
         if (!cb) {
+            const persistHandler = new PersistentHandler(this.consumer, host, port, user, pwd, database);
             cb = function(d) {
                 try {
-                    const persistHandler = new PersistentHandler(host, port, user, pwd, database);
                     persistHandler.handleEvent(d);
                 } catch(err) {
                     console.error('persistHandler error:', err);
@@ -31,10 +33,11 @@ class Consumer {
         }
         this.consumer.consume((err, d) => {
             if (err) {
-                console.error("kafka consuming error: ", err)
+                console.error("kafka consuming error: ", err, d)
             } else {
-                log(`the offset of the message received: ${d.offset}`);
+                log(`the offset of the message received: ${d.offset}, ${this}`);
                 cb(d);
+                this.emit("event_handled", d);
             }
         });
        

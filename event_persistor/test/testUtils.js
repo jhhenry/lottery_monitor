@@ -2,11 +2,13 @@ const persistor = require('../event_persist');
 const fs = require('fs');
 const path = require('path');
 const util = require('util');
+const chalk = require('chalk');
 const exec = util.promisify(require('child_process').exec);
 const crypto = require('crypto');
+const log = console.log;
 
 async function createTestDatabase(t) {
-    const newDatabaseName = 'test_' + getRandBytes(20);
+    const newDatabaseName = 'test_' + getRandBytes(5);
     //console.log(`t.context: ${t.context}`);
     t.context.newDatabaseName = newDatabaseName;
     const createDatabasesStr = "CREATE DATABASE IF NOT EXISTS " + newDatabaseName;
@@ -72,8 +74,21 @@ function getRandBytes(num, encoding)
    return  crypto.randomBytes(num).toString(encoding ? encoding : 'hex');
 }
 
+async function wait(second) {
+    await new Promise((resolve,) => {
+        const inter = setInterval(() => {
+            log(chalk.magentaBright('waiting...'));
+        }, 10000);
+        setTimeout(() => {
+            clearInterval(inter);
+            resolve();
+        }, second * 1000);
+    });
+}
+
 module.exports.createTestDatabase = createTestDatabase;
 module.exports.dropTestDatabase = dropTestDatabase;
 module.exports.createTopic = createTopic;
 module.exports.deleteTopic = deleteTopic;
 module.exports.getRandBytes = getRandBytes;
+module.exports.wait = wait;

@@ -5,7 +5,7 @@ const KafkaClient = require('../kafka_client');
 const testUtils = require('./testUtils');
 const reader = require('../event_reader');
 
-const brokers = process.env.kafkaBrokers ? process.env.kafkaBrokers : "192.168.56.103:9092,192.168.56.103:9093,192.168.56.103:9094";
+const brokers = process.env.kafkaBrokers ? process.env.kafkaBrokers : KafkaClient.defaultBrokers;
 const event_template = {
     address: "0x6dEFcB6F97E4b9765B88ebcaAF8A98f6338571f3",
     blockNumber: 4223,
@@ -45,7 +45,7 @@ const event_template = {
     capture_time: "2019-01-01 22:22:22.222"
 };
 
-const messags_count = 10;
+const messages_count = 10;
 
 test.before('produce messages to kafka asynchronously', async t => {
     //create a new database for test
@@ -55,9 +55,9 @@ test.before('produce messages to kafka asynchronously', async t => {
     console.log('before test');
     const admin = KafkaClient.getAdminClient(brokers, 'admin_client');
     t.context.admin = admin;
-    const topic = 'event_reader_test_' + testUtils.getRandBytes(16, 'hex');
+    const topic = 'event_reader_test_' + testUtils.getRandBytes(3, 'hex');
     t.context.topic = topic;
-    await testUtils.createTopic(admin, topic, 1, 3);
+    await testUtils.createTopic(admin, topic, 1, 2);
 
     // constructs events messages
     const producer = await KafkaClient.getProducer(brokers);
@@ -66,7 +66,7 @@ test.before('produce messages to kafka asynchronously', async t => {
          // send them to the kafka topic
         console.log('start producing test messages to kafka');
         let count = 0;
-        while (count < messags_count) {
+        while (count < messages_count) {
             const e = {};
             Object.assign(e, event_template);
             e.transactionHash = testUtils.getRandBytes(32, 'hex');
@@ -94,46 +94,61 @@ test.after('close kafka admin client', async t => {
 test('successful consuming test', async t => {
     console.log('consumer test');
     const topic = t.context.topic; 
-    reader(brokers, topic, 'test_group_' + testUtils.getRandBytes(4, 'hex'), 0, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
-    const consumer = await KafkaClient.getConsumer("test_confirm_group" + testUtils.getRandBytes(4, 'hex'), brokers);
+    const c = await KafkaClient.getConsumer("test_confirm_group" + testUtils.getRandBytes(4, 'hex'), brokers);
+    const event_consumer = new reader.Consumer(c);
+    let messages_handled = 0;
+    event_consumer.on('event_handled', function (d){
+        log(chalk.cyan(`received data in the event_handled`));
+        messages_handled++;
+    });
+    event_consumer.start(topic, 0, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
     
-    consumer.subscribe([topic]);
-    consumer.consume();
-    console.log(`subscribed to the topic: ${topic}`);
+    log(`subscribed to the topic: ${topic}`);
     try {
        // reader(brokers, topic, 'test_group', -1, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
         await new Promise((resolve, reject) => {
-            //setTimeout(resolve, messags_count * 1500);
-            let c = 0;
-            const timeout = messags_count * 1.5 * 1000;
-            const start = Date.now();
-            consumer.on("data", (d) => {
-                // const event = JSON.parse(d.value);
-                // log(chalk.yellow(`received data in the confirm group`));
-                c++;
-                if (c == messags_count) {
-                    setTimeout(()=> {
-                        resolve();
-                    }, 1000);// the reader should have consumed all expected messages, too.   
-                }
-            });
-            setInterval(() => {
-                if (Date.now() - start > timeout) {
-                    reject("timeout")
+            const iid = setInterval(() => {
+                if (messages_handled == messages_count) {
+                    clearInterval(iid)
+                    resolve();
                 }
             }, 1000);
-        });
+            setTimeout(reject, messages_count * 2 *1000);
+        })
+        //await waitForMessages(c, messages_count);
         const [event_rows, ] = await t.context.con.query("select id from events");
         const [redeemed_rows, ] = await t.context.con.query("select lottery_sig from redeemedInfo");
         t.is(event_rows.length, 10);
         t.is(redeemed_rows.length, 10);
         t.pass();
     } catch(err) {
+        console.error(err);
         t.fail(err);
     } finally {
-        consumer.disconnect();
+        //consumer.disconnect();
+        event_consumer.stop();
     }
 });
+
+async function waitForMessages(consumer, messages_count)
+{
+    await new Promise((resolve, reject) => {
+        //setTimeout(resolve, messages_count * 1500);
+        let c = 0;
+        const timeout = messages_count * 2.5 * 1000;
+        consumer.on("event_handled", (d) => {
+            // const event = JSON.parse(d.value);
+            log(chalk.cyan(`received data in the waitForMessages`));
+            c++;
+            if (c == messages_count) {
+                setTimeout(resolve, 2000);// the reader should have consumed all expected messages, too.   
+            }
+        });
+        setTimeout(() => {
+            reject("waitForMessages timeout")
+        }, timeout);
+    });
+}
 
 test.todo('restart the consumer & expect the correct offset');
 

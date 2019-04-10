@@ -3,7 +3,8 @@ const log = console.log;
 
 class PersistentHandler {
 
-    constructor(host, port, user, pwd, database) {
+    constructor(kafka_consumer, host, port, user, pwd, database) {
+        this.consumer = kafka_consumer;
         this.pool = event_persist.createPool(host, port, user, pwd, database);
     }
 
