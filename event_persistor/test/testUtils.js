@@ -22,6 +22,10 @@ async function createTestDatabase(t) {
     //console.log(`createStat: ${createStat}`);
     await con.query(createStat.substr(0, index));
     await con.query(createStat.substr(index));
+
+    //create kafka_event_received
+    const createKafka = fs.readFileSync(path.resolve(__dirname, "..", "database", "kafka_events_received.sql")).toString();
+    await con.query(createKafka);
 }
 
 async function dropTestDatabase(t) {

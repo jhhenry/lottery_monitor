@@ -41,7 +41,38 @@ async function recordRedeemedEvent(connection, eventValues, redeemedValues) {
     }
 }
 
+async function recordKafkaEventReceived(connection, kafka_event)
+{
+    const [rows,] = await queryKafkaEventReceived(connection, kafka_event);
+    if(rows.length == 0) {
+        try {
+            await connection.beginTransaction();
+            const eventResult = await connection.query('INSERT INTO kafka_events_received SET ?', kafka_event);
+            await connection.commit();
+            return Promise.resolve([eventResult[0].insertId, kafka_event.handling_state]);
+        } catch (err) {
+            connection.rollback();
+            throw err;
+        }
+    } else {
+        let r = rows[0];
+        return Promise.resolve([r.id, r.handling_state]);
+    }
+}
+
+async function queryKafkaEventReceived(connection, kafka_event) {
+    try {
+        const [rows, cols] = await connection.query('select id, handling_state from kafka_events_received where topic = ? and partitionid = ? and consumer_group = ? and offset = ?', 
+            [kafka_event.topic, kafka_event.partitionid, kafka_event.consumer_group, kafka_event.offset]);
+       return Promise.resolve([rows, cols]);
+    } catch (err) {
+        throw err;
+    }
+}
+
 module.exports.createPool = createPool;
 module.exports.createConnection = createConnection;
 module.exports.recordRedeemedEvent = recordRedeemedEvent;
+module.exports.queryKafkaEventReceived = queryKafkaEventReceived;
+module.exports.recordKafkaEventReceived = recordKafkaEventReceived;
 module.exports.disconnect = disconnect;
