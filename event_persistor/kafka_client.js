@@ -34,31 +34,45 @@ function getProducer(broker_list) {
     );
 }
 
-function produceMessages(producer, topic, sample_message, messages_count) {
+function produceMessages(producer, topic, sample_message, messages_count, message_constructor, options) {
     return new Promise((resolve, reject) => {
         let messageDelivered = 0;
         producer.on('delivery-report', function(err, report) {
             if(err) {
                 reject(err);
             }
-            //console.log(report);
             //if (report.offset >= 0) {
             messageDelivered++;
             //}
             if (messageDelivered >= messages_count) {
                 //console.log(`all messages on ${topic} are sent`);
-                resolve();
+                resolve(messageDelivered);
             }
         });
+        // Poll for events every 100 ms
+        producer.setPollInterval(100);
         let count = 0;
+        let timeout = options && !isNaN(options.interval)? messages_count * 1.2 * options.interval : messages_count * 1500;
+        //console.log(`produce message timeout: ${timeout}`);
         while (count < messages_count) {
-            const e = {};
-            Object.assign(e, sample_message);
-            e.index = count;
-            producer.produce(topic, null, Buffer.from(JSON.stringify(e)), "test_event", Date.now());
+            let e = {};
+            if (message_constructor && typeof message_constructor === "function") {
+                e = message_constructor(sample_message)
+            } else {
+                Object.assign(e, sample_message);
+                e.index = count;
+            }
+            //console.log(`sending message to ${topic}`);
+            if (options && !isNaN(options.interval)) {
+                setTimeout(() => {
+                    producer.produce(topic, null, Buffer.from(JSON.stringify(e)), "test_event", Date.now());
+                }, options.interval * count);
+            } else {
+                producer.produce(topic, null, Buffer.from(JSON.stringify(e)), "test_event", Date.now());
+            }
             count++;
         }
-        setTimeout(() => {reject("producing message timeout");}, 5000);
+        setTimeout(() => {reject("producing message timeout");}, timeout);
     }
     );
 }

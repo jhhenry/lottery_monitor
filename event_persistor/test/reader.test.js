@@ -1,9 +1,14 @@
 const test = require('ava');
 const chalk = require('chalk');
-const log = console.log;
+const path = require('path');
+const util = require('util');
+
 const KafkaClient = require('../kafka_client');
 const testUtils = require('./testUtils');
 const reader = require('../event_reader');
+
+const logPrefix = `<${path.basename(__filename)}> `;
+const log = function (message) { console.log(chalk.magenta(logPrefix), chalk.cyan(message)); };
 
 const brokers = process.env.kafkaBrokers ? process.env.kafkaBrokers : KafkaClient.defaultBrokers;
 const event_template = {
@@ -47,65 +52,52 @@ const event_template = {
 
 const messages_count = 10;
 
-test.before('produce messages to kafka asynchronously', async t => {
+test.before('create a temp database and tables for test', async t => {
     //create a new database for test
-    await testUtils.createTestDatabase(t);
-
-    // create a temp kafka topic
-    console.log('before test');
     const admin = KafkaClient.getAdminClient(brokers, 'admin_client');
     t.context.admin = admin;
+    const producer = await KafkaClient.getProducer(brokers);
+    t.context.producer = producer;
+});
+
+test.after("close kafka admin and producer & drop the temp database", async t => {
+    t.context.admin.disconnect();
+    t.context.producer.disconnect();
+
+});
+
+test.beforeEach('create kafka topic', async t => {
+    log("before each")
+    await testUtils.createTestDatabase(t);
+    const admin = t.context.admin;
     const topic = 'event_reader_test_' + testUtils.getRandBytes(3, 'hex');
     t.context.topic = topic;
     await testUtils.createTopic(admin, topic, 1, 2);
-
-    // constructs events messages
-    const producer = await KafkaClient.getProducer(brokers);
-    t.context.producer = producer;
-    {
-         // send them to the kafka topic
-        console.log('start producing test messages to kafka');
-        let count = 0;
-        while (count < messages_count) {
-            const e = {};
-            Object.assign(e, event_template);
-            e.transactionHash = testUtils.getRandBytes(32, 'hex');
-            setTimeout(() => {
-                producer.produce(topic, null, Buffer.from(JSON.stringify(e)), "test_event", Date.now());
-                producer.flush(500, () => {
-                    //log(chalk.yellow(`message flushed: ${r1}, ${r2}`));
-                });
-            }, count * 1000);
-            count++;
-        }
-    };
+    sendKafkaMessages(t, messages_count);
 });
 
-test.after('close kafka admin client', async t => {
-    console.log('test after');
+test.afterEach('close kafka admin client', async t => {
     // delete the topic once all the tests completed
     const admin = t.context.admin;
     await testUtils.deleteTopic(admin, t.context.topic);
     await testUtils.dropTestDatabase(t);
-    admin.disconnect();
-    t.context.producer.disconnect();
 });
 
 test('successful consuming test', async t => {
-    console.log('consumer test');
-    const topic = t.context.topic; 
+    log('consumer test');
+    const topic = t.context.topic;
     const c = await KafkaClient.getConsumer("test_confirm_group" + testUtils.getRandBytes(4, 'hex'), brokers);
     const event_consumer = new reader.Consumer(c);
     let messages_handled = 0;
-    event_consumer.on('event_handled', function (d){
-        log(chalk.cyan(`received data in the event_handled`));
+    event_consumer.on('event_handled', function (d) {
+       // log(`received data in the event_handled`);
         messages_handled++;
     });
     event_consumer.start(topic, 0, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
-    
+
     log(`subscribed to the topic: ${topic}`);
     try {
-       // reader(brokers, topic, 'test_group', -1, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
+        // reader(brokers, topic, 'test_group', -1, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
         await new Promise((resolve, reject) => {
             const iid = setInterval(() => {
                 if (messages_handled == messages_count) {
@@ -113,15 +105,18 @@ test('successful consuming test', async t => {
                     resolve();
                 }
             }, 1000);
-            setTimeout(reject, messages_count * 2 *1000);
-        })
+            setTimeout(reject, messages_count * 2 * 1000);
+        });
+        await testUtils.wait(3);
         //await waitForMessages(c, messages_count);
-        const [event_rows, ] = await t.context.con.query("select id from events");
-        const [redeemed_rows, ] = await t.context.con.query("select lottery_sig from redeemedInfo");
+        const [event_rows,] = await t.context.con.query("select id from events");
+        const [redeemed_rows,] = await t.context.con.query("select lottery_sig from redeemedInfo");
+        const [kafka_rows,] = await t.context.con.query('select id from kafka_events_received');
         t.is(event_rows.length, 10);
         t.is(redeemed_rows.length, 10);
+        t.is(kafka_rows.length, 10);
         t.pass();
-    } catch(err) {
+    } catch (err) {
         console.error(err);
         t.fail(err);
     } finally {
@@ -130,27 +125,100 @@ test('successful consuming test', async t => {
     }
 });
 
-async function waitForMessages(consumer, messages_count)
-{
-    await new Promise((resolve, reject) => {
-        //setTimeout(resolve, messages_count * 1500);
-        let c = 0;
-        const timeout = messages_count * 2.5 * 1000;
-        consumer.on("event_handled", (d) => {
-            // const event = JSON.parse(d.value);
-            log(chalk.cyan(`received data in the waitForMessages`));
-            c++;
-            if (c == messages_count) {
-                setTimeout(resolve, 2000);// the reader should have consumed all expected messages, too.   
+test('restart the consumer & use the offset stored in the database', async t => {
+    // The monitor consistently sends events to the kafka topic
+    // The consumer & persistor consumes the first 10 events then crashes.
+    // The admin restarts the consumer using the same group 
+    // & the offset stored in the mysql to catch up the latest events
+    // meanwhile avoid as much duplicate messages as possible
+    const topic = t.context.topic;
+    const conn = t.context.con;
+    const consumer_group = "test_confirm_group" + testUtils.getRandBytes(4, 'hex');
+    try {
+        const c = await KafkaClient.getConsumer(consumer_group, brokers);
+        const event_consumer = new reader.Consumer(c);
+        let messages_handled = 0;
+        let stopped = false;
+        let disconnected = false;
+        event_consumer.on('event_handled', function () {
+            //log(`received data in the event_handled`);
+            messages_handled++;
+            if (messages_handled >= 10 && !stopped) {
+                event_consumer.stop();
+                c.disconnect();
+                log("called stop");
+                log(`c.isconnected: ${c.isConnected()}`);
+                stopped = true;
             }
         });
-        setTimeout(() => {
-            reject("waitForMessages timeout")
-        }, timeout);
-    });
+        c.on('disconnected', function (r, err) {
+            if (err) {
+                console.error(err);
+                throw err;
+            }
+            disconnected = true;
+            log("consumer disconnected");
+        })
+        
+        event_consumer.start(topic, 0, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
+        const stopPromise = new Promise((resolve, reject) => {
+            const iid = setInterval(function () {
+                if ((!c.isConnected() || disconnected) && stopped) {
+                    clearInterval(iid);
+                    resolve();
+                } 
+            }, 500);
+            setTimeout(reject, 20000);
+        })
+        const sendPromise = sendKafkaMessages(t, 50, {
+            interval: 200 // 1 second
+        })
+        //log("will pass");
+        log('waiting for disconnected');
+        await stopPromise;
+        log(`c.isconnected: ${c.isConnected()}`);
+    
+        // start a new consumer & reader
+        const c2 = await KafkaClient.getConsumer(consumer_group, brokers);
+        const event_consumer2 = new reader.Consumer(c2);
+    
+        // get new offset
+        let newOffset = 0;
+        const [maxOffsets, ] = await conn.query('select max(offset) from kafka_events_received where topic = ? and partitionid = ? and consumer_group = ? and handling_state="stored"', [topic, 0, consumer_group]);
+        newOffset = maxOffsets[0]['max(offset)'] + 1;
+        log(`newOffset: ${newOffset}`);
+    
+        event_consumer2.start(topic, newOffset, 'localhost', 3306, 'root', 'Hjin_5105', t.context.newDatabaseName);
+        log("sening another X messages");
+        await sendPromise;
+        await testUtils.wait(5);
+        
+        const [event_rows,] = await conn.query("select id from events");
+        const [redeemed_rows,] = await conn.query("select lottery_sig from redeemedInfo");
+        const [kafka_rows,] = await conn.query('select id from kafka_events_received');
+        //log(`event_rows: ${event_rows.length}, redeemed_rows: ${redeemed_rows.length}, kafka_rows: ${kafka_rows.length}`);
+        t.is(event_rows.length, 60);
+        t.is(redeemed_rows.length, 60);
+        t.is(kafka_rows.length, 60);
+        event_consumer2.stop();
+    } catch(err) {
+        t.fail(err);
+    }
+   
+
+});
+
+function sendKafkaMessages(t, count, options) {
+    return KafkaClient.produceMessages(t.context.producer, t.context.topic, event_template, count, e_t => {
+        const e = {};
+        Object.assign(e, e_t);
+        e.transactionHash = testUtils.getRandBytes(32, 'hex');
+        return e;
+    }, options);
 }
 
-test.todo('restart the consumer & expect the correct offset');
+test.todo('restart the consumer & use the committed offset in the kafka topic partition');
+
 
 
 

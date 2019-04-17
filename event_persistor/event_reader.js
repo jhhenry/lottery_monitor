@@ -1,7 +1,10 @@
 const EventEmitter = require('events');
+const path = require('path');
+const LOGGER = require('./logUtils')({prefix: `<${path.basename(__filename)}> `, style: "bgBlue"});
+
 const kafka_client = require("./kafka_client");
 const {PersistentHandler} = require('./event_handler');
-const log = console.log;
+
 class Consumer extends EventEmitter{
     constructor(c) {
         super();
@@ -19,10 +22,11 @@ class Consumer extends EventEmitter{
             //log(`call this.consumer.assign offset: ${offset}`);
             this.consumer.assign([{ topic, partition: 0, offset }]);
         }
-        log(`start consuming on topic '${topic}' from the offset ${offset}`);
+        
+        LOGGER(`start consuming on topic '${topic}' from the offset ${offset}`);
         
         if (!cb) {
-            const persistHandler = new PersistentHandler(this.consumer, host, port, user, pwd, database);
+            const persistHandler = new PersistentHandler(this.consumer.globalConfig['group.id'], host, port, user, pwd, database);
             cb = function(d) {
                 try {
                     persistHandler.handleEvent(d);
@@ -30,16 +34,21 @@ class Consumer extends EventEmitter{
                     console.error('persistHandler error:', err);
                 }
             };
-        }
-        this.consumer.consume((err, d) => {
-            if (err) {
-                console.error("kafka consuming error: ", err, d)
-            } else {
-                log(`the offset of the message received: ${d.offset}, ${this}`);
-                cb(d);
-                this.emit("event_handled", d);
-            }
+        };
+        this.consumer.on('data', (d) => {
+            cb(d);
+            this.emit("event_handled", d);
         });
+        this.consumer.consume();
+        // this.consumer.consume((err, d) => {
+        //     if (err) {
+        //         console.error("kafka consuming error: ", err, d)
+        //     } else {
+        //         // LOGGER(`the offset of the message received: ${d.offset}, ${this}`);
+        //         cb(d);
+        //         this.emit("event_handled", d);
+        //     }
+        // });
        
     }
 
@@ -59,7 +68,7 @@ function run(kafkaBrokers, topic, group, offset, host, port, user, pwd, database
             consumer.assign([{topic, partition: 0, offset}]);
         }
         consumer.consume();
-        log(`start consuming on topic '${topic}' from the offset ${offset}, using the group ${group}`);
+        LOGGER(`start consuming on topic '${topic}' from the offset ${offset}, using the group ${group}`);
         //const dataHandler = cb ? cb : persistHandler.handleEvent;
         if (cb) {
             consumer.on("data", cb);
