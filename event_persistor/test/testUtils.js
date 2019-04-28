@@ -5,6 +5,10 @@ const util = require('util');
 const chalk = require('chalk');
 const exec = util.promisify(require('child_process').exec);
 const crypto = require('crypto');
+const _ = require('lodash');
+
+const logUtils = require("../logUtils")
+const LOGGER = logUtils({ prefix: "<testUtils> ", style: "cyan" });
 const log = console.log;
 
 async function createTestDatabase(t) {
@@ -90,9 +94,58 @@ async function wait(second) {
     });
 }
 
+/**
+ * Compare two objects' common properties. If the values of their shared properties are all equal, return true.
+ * Note: do not use options if you expect the compared objects are string, number, and other primitive types.
+ * @param {object} obj 
+ * @param {object} other 
+ * @param {object} options propMap: Map, exclude: []
+ */
+function isEqual(obj, other, options) {
+    if (!options && _.isEqual(obj, other)) return true;
+    if(_.isNil(obj) && _.isNil(other)) return true;
+    if ((!_.isNil(obj) && _.isNil(other)) || (_.isNil(obj) && !_.isNil(other))) return false;
+    const stringToNum = (_.isNumber(obj) && _.isString(other)) || (_.isNumber(other) && _.isString(obj));
+    if (stringToNum) {
+        return _.toNumber(obj) == _.toNumber(other);
+    }
+    //LOGGER("comparing object: ", {obj, other, options});
+    const exclude = options && options.exclude ? options.exclude : undefined;
+    const pMap = options ? options.propMap : undefined;
+    const [obj1, obj2] = _.isPlainObject(obj) && _.isPlainObject(other) ? [obj, other] : (!_.isPlainObject(obj) ? [obj, _.create(Object.getPrototypeOf(obj), other)] : [_.create(Object.getPrototypeOf(other), obj), other]);
+    obj = recreateObject(obj1, pMap);
+    other = obj2;
+    return _.isEqualWith(obj, other, function (v1, v2, key, p, op, stack) {
+        if (!key) return undefined;
+        // if(exclude) LOGGER({exclude, key}, _.includes(exclude, key))
+        if (exclude && _.includes(exclude, key)) {
+            return true;
+        }
+        // LOGGER(`comparing key, "${key}": `, v1, ", ", v2 );
+        return isEqual(v1, v2) == true
+    });
+}
+
+function recreateObject(src, propMap) {
+    if(_.isMap(propMap) && !_.isEmpty(propMap)) {
+        const target = _.isPlainObject(src) ? {} : _.create(Object.getPrototypeOf(src));
+        _.keysIn(src).forEach(key => {
+            if (propMap.has(key)) {
+                target[propMap.get(key)] = src[key];
+            } else {
+                target[key] = src[key];
+            }
+        })
+        return target;
+    } else {
+        return src;
+    }
+}
+
 module.exports.createTestDatabase = createTestDatabase;
 module.exports.dropTestDatabase = dropTestDatabase;
 module.exports.createTopic = createTopic;
 module.exports.deleteTopic = deleteTopic;
 module.exports.getRandBytes = getRandBytes;
 module.exports.wait = wait;
+module.exports.isEqual = isEqual;

@@ -11,10 +11,11 @@
   "dependencies": {
     "meow": "^5.0.0",
     "mysql2": "^1.6.5",
-    "node-rdkafka": "^2.6.1"
+    "node-rdkafka": "^2.6.1",
+    "lodash": "^4.17.11",
+    "chalk": "^2.4.2"
   },
   "devDependencies": {
-    "ava": "^1.4.0",
-    "chalk": "^2.4.2"
+    "ava": "^1.4.0"
   }
 }

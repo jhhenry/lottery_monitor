@@ -6,5 +6,6 @@ create table kafka_events_received (
     offset INT UNSIGNED,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     handling_state ENUM("processing", "stored"), 
-    PRIMARY KEY(id)
+    PRIMARY KEY(id),
+    UNIQUE(consumer_group, topic, partitionid, offset)
 );
