@@ -23,7 +23,7 @@ The "start" function in the event_reader.js accepts a "offset" parameter to star
 The message handler in the event_handler.js checks the data in the database whether a kafka event is really handled. If yes, it will not be stored or processed again.(<span style="color:green">Status: Realized</span>)
 
 ## Engineering Req. 4
-In the case that the "events" table gets a duplicate error forced by the ”txn" + "event_type" unique constraints, set the state of the corresponding record in the "kafka_events_received" table to "processed" though.  (<span style="color:green">Status: Planned</span>)
+In the case that the "events" table gets a duplicate error forced by the ”txn" + "event_type" unique constraints, set the state of the corresponding record in the "kafka_events_received" table to "stored" though.  (<span style="color:green">Status: Realized</span>)
 
 ## Engineering Req. 5
 Solution 1: Write an application that checks the "kafka_events_received" table at interval to record the offsets that have not been processed.  (<span style="color:green">Status: Considered</span>)
