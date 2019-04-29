@@ -27,8 +27,9 @@ test('test query non-existence kafka_event_received', async t => {
         consumer_group: "test_consumer",
         offset: 100
     };
-    const [rows, ] = await persist.queryKafkaEventReceived(conn, kafka_event);
-    t.is(rows.length, 0);
+    const [id, handling_state] = await persist.queryKafkaEventReceived(conn, kafka_event);
+    t.falsy(id);
+    t.falsy(handling_state);
 });
 
 test.serial('add a new kafka_event_received', async t => {
@@ -61,3 +62,27 @@ test.serial('add a new kafka_event_received', async t => {
     t.is(rows.length, 2);
     t.is(rows[1].id, 2);
 });
+
+test("record redeemed values", async t => {
+    const eventValues = {
+        blockNumber: 22233,
+        event_type: "Redeemed",
+        event_capture_time: "2019-01-01 22:22:22.222",
+        txn: testUtils.getRandBytes(32, 'hex'),
+        event_info: JSON.stringify({test:'test'})
+    };
+    const conn = t.context.con;
+    try {
+        await conn.beginTransaction();
+        const eventResult = await conn.query('INSERT INTO events SET ?', eventValues);
+        log(eventResult);
+        const commitResult = conn.commit();
+        await commitResult;
+        const [event_rows, ] = await t.context.con.query("select id from events");
+        t.is(event_rows.length, 1);
+        t.pass();
+    } catch (err) {
+        t.fail(err);
+        conn.rollback();
+    }
+})
