@@ -24,7 +24,6 @@ async function disconnect(connection) {
 async function recordRedeemedEvent(connection, lottery_event, redeemedValues, kafka_event) {
     if (!kafka_event.id) throw Error('kafka_event must exist in the database');
     try {
-        console.log(kafka_event.id);
         await connection.beginTransaction();
         // log('start inserting to events: ');
         const eventResult = await connection.query('INSERT INTO events SET ?', lottery_event);
